@@ -1,88 +1,50 @@
-# [Ant Media Server](https://antmedia.io/) WebRTC SDK
+# TunaDesk - Remote Desktop Application via Web Browser
 
-WebSocket interface in publishing and playing WebRTC streams on Ant Media Server using Javascript.
+TunaDesk is a Remote Desktop Control application running in Ant Media Server and it uses Web Browser to connect to host. Host application is a nodejs application and Client application is just a web browser. It relays mouse clicks, mouse move, keyboard events, etc. 
 
-For more information, visit [antmedia.io](https://antmedia.io)
+Maturity: PoC
 
 
-[![NPM version](https://img.shields.io/badge/npm-v2.4.3-informational)](https://www.npmjs.com/package/@antmedia/webrtc_adaptor)
-[![Build Status](https://api.travis-ci.com/ant-media/StreamApp.svg?branch=master)](https://app.travis-ci.com/github/ant-media/StreamApp)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=io.antmedia%3Aant-media-server&metric=alert_status)](https://sonarcloud.io/dashboard?id=io.antmedia%3Aant-media-server)
+## Build and Use
 
-## <a name="installation"></a>Installation
+## Build the TunaDesk Server Application
 
-Using npm:
-```shell
-$ npm install @antmedia/webrtc_adaptor
+### TunaDesk Server Application
+- Clone the repository and build the project with `mvn`
 ```
-
-Using yarn:
-```shell
-$ yarn add @antmedia/webrtc_adaptor
+mvn clean install -DskipTests -Dgpg.skip=true
 ```
+- Upload the war file(`target/TunaDesk.war`) to the Ant Media Server Enterprise Web Panel to Create the Application
 
-## <a name="requirements"></a>Requirements
 
-Before start using Ant Media Server WebRTC SDK, you need a distribution of the Ant Media Server running on a server or local machine.
-[Quick Start - Ant Media Server](https://resources.antmedia.io/docs/quick-start)
-
-## <a name="usage">Usage
-
-In your project, run:
-
+### Host 
+- Copy the Node.js application on https://github.com/ant-media/TunaDesk/tree/master/src/host
+- Install Node.js to host - https://nodejs.org/en
+- Run the `npm install`
 ```
-npm i @antmedia/webrtc_adaptor --save-dev
+npm install
 ```
-Then inside your javascript file:
-#### <a name="initialize">Initialize the WebRTCAdaptor
-```javascript
-  // ...
-import { WebRTCAdaptor } from '@antmedia/webrtc_adaptor';
-
-const webRTCAdaptor = new WebRTCAdaptor({
-    websocket_url: "wss://your-domain.tld:5443/WebRTCAppEE/websocket",
-    mediaConstraints: {
-        video: true,
-        audio: true,
-    },
-    peerconnection_config: {
-        'iceServers': [{'urls': 'stun:stun1.l.google.com:19302'}]
-    },
-    sdp_constraints: {
-        OfferToReceiveAudio : false,
-        OfferToReceiveVideo : false,
-    },
-    localVideoId: "id-of-video-element", // <video id="id-of-video-element" autoplay muted></video>
-    bandwidth: int|string, // default is 900 kbps, string can be 'unlimited'
-    dataChannelEnabled: true|false, // enable or disable data channel
-    callback: (info, obj) => {}, // check info callbacks bellow
-    callbackError: function(error, message) {}, // check error callbacks bellow
-});
-//...
+- Run the `index.js` with `node`
 ```
-In another part of your script:
-#### <a name="publish">Publish
-```javascript
-// You can start streaming by calling the publish method
-webRTCAdaptor.publish(streamId);
+node index.js
 ```
+- Open a web browser tab and go to `https://{YOUR_ANT_MEDIA_SERVER}:5443/TunaDesk/index.html`
+- Choose "Entire Screen" and Allow in the popup window
+- Save the `streamId` on the screen because we'll use in next section
+- Click `Start Publishing` button
 
-#### <a name="play">Play
-```javascript
-// You can start streaming by calling the publish method
-webRTCAdaptor.play(streamId);
-```
+### Client
+- Open a web browser tab in a different computer to connect to Host and go to `https://{YOUR_ANT_MEDIA_SERVER}:5443/TunaDesk/remote_desktop.html`
+- Write the same `streamId` in the previous step
+- Click `Start Playing` button
 
-## Samples
-Visit The [Samples List](https://resources.antmedia.io/docs/sample-tools-and-applications) and look at their [sources codes](https://github.com/ant-media/StreamApp/tree/master/src/main/webapp)
+Then you can control the host computer through video player. 
 
-## <a name="documentation">Documentation
-[Javascript SDK Documentation](https://resources.antmedia.io/docs/javascript-sdk)
+## Developer Guide
 
-## <a name="livedemo">Live Demo
-You can check our [live demo](https://antmedia.io/live-demo).
-
-## <a name="issues">Issues
-Create issues on the [Ant-Media-Server](https://github.com/ant-media/Ant-Media-Server/issues)
+There are three main components in this project. 
+1. Client webapp just listen mouse events, keyboard events and sends data to Host through Data channel
+2. Host webapp receives events and sends these events to `nodejs` application through websocket. This the [JS plugin]([url](https://github.com/ant-media/TunaDesk/blob/master/src/main/webapp/js/desktop-control-plugin.js)) relating messages to the websocket 
+3. [Node.js application]([url](https://github.com/ant-media/TunaDesk/blob/master/src/host/index.js)) running in host creates a websocket server and receives the events coming from Host webapp to trigger mouse, keyboard events etc.  
 
 
