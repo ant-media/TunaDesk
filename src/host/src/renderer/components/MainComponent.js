@@ -118,6 +118,7 @@ export default class MainComponent extends Component {
 
 
 startPublishing = () => {
+  console.log("STARTING TO PUBLISH!")
  this.streamId = this.generateId().toString()
 this.webRTCAdaptor.publish(this.streamId)
 
@@ -138,12 +139,7 @@ if(!this.publishing){
   this.webRTCAdaptor.setRdcStreamIdOnController(controllerSessionId, this.streamId, this.hostId)
 
 }
-
-
-
-
 //this.setState({status:STATUS_CONTROLLER_CONNECTING})
-
 
 }
 

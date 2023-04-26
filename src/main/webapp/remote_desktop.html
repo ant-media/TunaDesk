@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>WebRTC Samples > Play</title>
+<title>TunaDesk</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
 <link rel="stylesheet" href="css/external/bootstrap4/bootstrap.min.css" />
@@ -29,7 +29,7 @@
 	<div class="container">
 		<div class="header clearfix">
 			<div class="row">
-				<h3 class="col text-muted">Control Remote Desktop</h3>
+				<h3 class="col text-muted">TunaDesk: Remote Desktop Control Tool</h3>
 			</div>
 		</div>
 
@@ -47,15 +47,15 @@
 			</div>
 			<div class="form-group col-sm-12 text-left">
 				<input type="text" class="form-control"
-					id="streamName" placeholder="Type stream name">
+					id="hostIdInput" placeholder="Type host id">
 			</div>
 
 			
 				<div class="form-group">
 					<button class="btn btn-primary"
-						id="start_play_button">Start Playing</button>
+						id="start_control_button">Start Controlling</button>
 					<button class="btn btn-primary"
-						id="stop_play_button">Stop Playing</button>
+						id="stop_control_button">Stop Controlling</button>
 				</div>
 				
 				<div class="col-sm-10 offset-sm-1" id="stats_panel" style="display: none;">
@@ -117,15 +117,17 @@
 		}
 	  }
 	});		
-	var start_play_button = document.getElementById("start_play_button");
-	start_play_button.addEventListener("click", startPlaying, false)
-	var stop_play_button = document.getElementById("stop_play_button");
-	stop_play_button.addEventListener("click",stopPlaying,false);
+	var start_control_button = document.getElementById("start_control_button");
+	//start_play_button.addEventListener("click", startPlaying, false)
+	start_control_button.addEventListener("click", sendStartRemoteDesktopControl, false)
+	var stop_control_button = document.getElementById("stop_control_button");
+	stop_control_button.addEventListener("click",sendStopRemoteDesktopControl,false);
 
-	var streamNameBox = document.getElementById("streamName")
-	streamNameBox.defaultValue = "stream1";
+	var hostIdBox = document.getElementById("hostIdInput")
+	hostIdBox.defaultValue = "hostId";
 
 	var streamId;
+	var hostId;
 	
 	function toggleOptions() {
 		$(".options").toggle();
@@ -136,7 +138,7 @@
 			var iceState = webRTCAdaptor.iceConnectionState(streamId);
             if (iceState != null && iceState != "failed" && iceState != "disconnected") {
             
-				webRTCAdaptor.sendData($("#streamName").val(), JSON.stringify(event));
+				webRTCAdaptor.sendData(streamId, JSON.stringify(event));
 			}
 			else {
 				//alert("WebRTC playing is not active. Please click Start Playing first")
@@ -149,11 +151,19 @@
 	}
 	
 	function startPlaying() {
-		streamId = streamNameBox.value;
-		webRTCAdaptor.play(streamNameBox.value, token, "", []);
+		webRTCAdaptor.play(streamId, token, "", []);
 	}
 
-	function stopPlaying() {
+	function sendStartRemoteDesktopControl() {
+		console.log("SEND START REMOTE DESKTOP CONTROL")
+		var hostId = hostIdBox.value
+		webRTCAdaptor.sendStartRemoteDesktopControl(hostId)
+
+
+	}
+
+	function sendStopRemoteDesktopControl() {
+		webRTCAdaptor.sendStopRemoteDesktopControl(hostId)
 		webRTCAdaptor.stop(streamId);
 	}
 
@@ -223,7 +233,11 @@
 			x: eventXRatio,
 			y: eventYRatio
 		}
-		sendData(mousemoveEvent);
+		var event = {
+			"type" :"controlAction",
+			"event":mousemoveEvent
+		}
+		sendData(event);
 		console.log("mousemove event:");
 		console.log(mousemoveEvent);
 	});
@@ -251,11 +265,17 @@
 		}
 		console.log("click event:");
 		console.log(clickEvent);
-		sendData(clickEvent);
 		event.preventDefault();
+
+		var event = {
+			"type" :"controlAction",
+			"event":clickEvent
+		}
+		sendData(event);
 	});
 
 	remoteVideo.addEventListener("wheel", function(event){
+		
 		var wheelEvent = {
 			event: "wheel",
 			deltaX: event.deltaX,
@@ -263,22 +283,29 @@
 			deltaZ: event.deltaZ,
 			deltaMode: event.deltaMode,
 		};
+		var event = {
+			"type" :"controlAction",
+			"event":wheelEvent
+		}
 		console.log("wheel event:");
-		console.log(wheelEvent);
-		sendData(wheelEvent);
+		sendData(event);
 	});
 
-	remoteVideo.addEventListener("keypress", (event) => {
-		var keypressEvent = {
-			event: "keypress",
+	remoteVideo.addEventListener("keydown", (event) => {
+		var keydownEvent = {
+			event: "keydown",
 			key: event.key,
 			shiftKey: event.shiftKey,
 			ctrlKey: event.ctrlKey,
             altKey: event.altKey
 		}
-		console.log("keypress event:")
-		console.log(keypressEvent);
-		sendData(keypressEvent);
+		var event = {
+			"type" :"controlAction",
+			"event":keydownEvent
+		}
+		console.log("keydown event:")
+		console.log(keydownEvent);
+		sendData(event);
 		if (event.key == "Enter") {
 			//event.preventDefault();
 			//event.stopPropagation();
@@ -298,21 +325,21 @@
 		callback : function(info, obj) {
 			if (info == "initialized") {
 				console.log("initialized");
-				start_play_button.disabled = false;
-				stop_play_button.disabled = true;
+				start_control_button.disabled = false;
+				stop_control_button.disabled = true;
 			} else if (info == "play_started") {
 				//joined the stream
 				console.log("play started");
-				start_play_button.disabled = true;
-				stop_play_button.disabled = false;
+				start_control_button.disabled = true;
+				stop_control_button.disabled = false;
 				webRTCAdaptor.getStreamInfo(streamId); 
 				webRTCAdaptor.enableStats(obj.streamId);
 
 			} else if (info == "play_finished") {
 				//leaved the stream
 				console.log("play finished");
-				start_play_button.disabled = false;
-				stop_play_button.disabled = true;
+				start_control_button.disabled = false;
+				stop_control_button.disabled = true;
 				$("#stats_panel").hide();
 				// Reset stream resolutions in dropdown
 				document.getElementById("dropdownMenu").innerHTML = '<a class="dropdown-item active" href="#">Automatic</a>'; 
@@ -351,6 +378,20 @@
 			}
 			else if(info == "resolutionChangeInfo"){
 				console.log("Resolution is changed to "+obj["streamHeight"]);
+			}
+			else if(info == "setRdcStreamId"){
+				console.log("SET RDC STREAM ID CALLED!")
+				console.log(obj)
+
+				streamId = obj.rdcStreamId
+				hostId = hostIdBox.value
+				console.log(streamId)
+				startPlaying()
+
+			}else if(info == "rdcSessionFinished"){
+				console.log("SESSION FINISHED BY HOST")
+				alert("Remote desktop control session finished by host")
+
 			}
 			else {
 				console.log( info + " notification received");
