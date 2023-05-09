@@ -2,22 +2,27 @@
  * @NOTE: Prepend a `~` to css file paths that are in your node_modules
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
+ @font-face {
+  font-family: 'Danzza';
+  src: url('/assets/resource/danzza.ttf');
+}
 body {
   position: relative;
   color: white;
   height: 100vh;
-  background: #00033D;
-  font-family: sans-serif;
+  background: #DF0517;
+  font-family:  'Danzza';
   overflow-y: hidden;
   display: flex;
   justify-content: center;
-  align-items: center;
 }
 
 button {
   background-color: white;
+  color: #007BFF;
   padding: 10px 20px;
-  border-radius: 10px;
+  font-family:  'Danzza';
+  border-radius: 20px;
   border: none;
   appearance: none;
   font-size: 1.3rem;

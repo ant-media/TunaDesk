@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, desktopCapturer } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, desktopCapturer,Menu,dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -50,6 +50,15 @@ ipcMain.on('getStorage', async(event,arg) =>{
   mainWindow.webContents.send('storage', JSON.stringify(storage.data))
 
 })
+var openAtLogin = storage.get("openAtLogin")
+if(openAtLogin == undefined){
+  openAtLogin = false
+}
+
+app.setLoginItemSettings({
+  openAtLogin: openAtLogin,
+  path: app.getPath("exe")
+});
 
 
 ipcMain.on('controlEvent', async (event, arg) => {
@@ -79,6 +88,29 @@ ipcMain.on('controlEvent', async (event, arg) => {
        button = "right";
     }
     robot.mouseClick(button);
+  }else if(controlEventType == "wheel"){
+
+      var deltaX = controlEvent.deltaX
+      var deltaY = controlEvent.deltaY
+
+    robot.scrollMouse(deltaX, deltaY);
+
+  }else if(controlEventType == "mousedown"){
+
+    robot.mouseToggle('down');
+
+
+  }
+  else if(controlEventType == "mousedrag"){
+    console.log("recieved mouse drag!!")
+    var mouseX = parseInt(controlEvent.x * robot.getScreenSize().width);
+    var mouseY = parseInt(controlEvent.y * robot.getScreenSize().height);
+    console.log("mouse x: " + mouseX + " mouse y: " + mouseY + " screen size:" + robot.getScreenSize().width + "x" + robot.getScreenSize().height);
+    robot.dragMouse(mouseX, mouseY);
+
+  }
+  else if(controlEventType == "mouseup"){
+    robot.mouseToggle('up')
   }
   else if (controlEventType == "keydown") {
     var modifier = Array();
@@ -158,18 +190,22 @@ ipcMain.on('controlEvent', async (event, arg) => {
       robot.typeString("í")
       return;
     }
+
     if(controlEvent.key == "ó"){
       robot.typeString("ó")
       return;
     }
+
     if(controlEvent.key == "ú"){
       robot.typeString("ú")
       return;
     }
+
     if(controlEvent.key == "ñ"){
       robot.typeString("ñ")
       return;
     }
+
     if(controlEvent.key == "¿"){
       robot.typeString("¿")
       return;
@@ -215,21 +251,7 @@ const installExtensions = async () => {
     )
     .catch(console.log);
 };
-const createPopupWindow = async () =>{
-  const popupWindow = new BrowserWindow({
-    width: 400,
-    height: 300,
-    frame: false, // remove frame for a more "pop-up" look
-    alwaysOnTop: true, // keep the window on top of other windows
-    parent: mainWindow, // specify the main window as the parent
-    modal: true, // make the window modal (disables parent window)
-    webPreferences: {
-      nodeIntegration: true // enable Node.js integration
-    },
-  });
-  popupWindow.loadFile(resolveHtmlPath('index.html'));
 
-}
 
 const createWindow = async () => {
   if (isDebug) {
@@ -246,13 +268,14 @@ const createWindow = async () => {
 
   mainWindow = new BrowserWindow({
     show: false,
-    useContentSize:true,
+    width:500,
+    height:750,
     icon: getAssetPath('logo.png'),
     webPreferences: {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
-        nodeIntegration:true
+        nodeIntegration:true,
 
     },
   });
@@ -286,6 +309,159 @@ const createWindow = async () => {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  const isMac = process.platform === 'darwin';
+
+  // Define the menu template
+  const menuTemplate = [
+    // Add a "Settings" menu
+    {
+      label: 'Settings',
+
+      submenu: [
+        // Add an "Auto Start" option with a checkbox
+        {
+          label: 'Auto start accepting connections on app startup',
+          type: 'checkbox',
+          id:'autoStartAcceptingConnectionsMenu',
+          checked: false,
+          click: (menuItem) => {
+           if(menuItem.checked){
+
+            mainWindow.webContents.send('autoStartAcceptingConnections',true)
+
+            dialog.showMessageBox({
+              type: 'info',
+              title:"TunaDesk",
+              message: "After relaunching Tunadesk, it will automatically start accepting control connections without requiring you to click the 'Start Accepting Connections' button.",
+              buttons: ['OK']
+            }, (response) => {
+              if (response === 0) {
+                // OK button was clicked
+              }
+            })
+           }else{
+            mainWindow.webContents.send('autoStartAcceptingConnections',false)
+
+
+           }
+          }
+        },
+        {
+          label: 'Save hostId',
+          id:'saveHostIdMenu',
+          type: 'checkbox',
+          checked: false,
+          click: (menuItem) => {
+            if(menuItem.checked){
+              mainWindow.webContents.send('saveHostId',true)
+
+
+              dialog.showMessageBox({
+                type: 'info',
+                title:"TunaDesk",
+                message: "The host ID will be stored and will remain constant, retaining the same value across app restarts.",
+                buttons: ['OK']
+              }, (response) => {
+                if (response === 0) {
+                  // OK button was clicked
+                }
+              })
+             }else{
+              mainWindow.webContents.send('saveHostId', false)
+
+             }
+
+
+          }
+        },
+        {
+          label: 'TURN Configuration',
+          checked: false,
+          click: (menuItem) => {
+              mainWindow.webContents.send('enableTurn')
+
+          }
+        },
+        {
+          label: 'Launch TunaDesk at system startup',
+          type: 'checkbox',
+          id:'launchAtStartupMenu',
+          checked: false,
+          click: (menuItem) => {
+           if(menuItem.checked){
+
+            mainWindow.webContents.send('launchAtStartup', true)
+            app.setLoginItemSettings({
+              openAtLogin: true,
+              path: app.getPath("exe")
+            });
+
+            dialog.showMessageBox({
+              type: 'info',
+              title:"TunaDesk",
+              message: "Tunadesk will automaticly launch on system start.",
+              buttons: ['OK']
+            }, (response) => {
+              if (response === 0) {
+                // OK button was clicked
+              }
+            })
+           }else{
+            mainWindow.webContents.send('launchAtStartup', false)
+            app.setLoginItemSettings({
+              openAtLogin: false,
+              path: app.getPath("exe")
+            });
+
+           }
+          }
+        },
+      ]
+    }
+  ];
+
+  // Create the menu
+  const menu = Menu.buildFromTemplate(menuTemplate);
+
+  // Set the menu for the app
+  Menu.setApplicationMenu(menu);
+
+
+
+  ipcMain.on('checkAutoStartAcceptingConnectionsMenu', async (event,arg) =>{
+
+    const autoStartMenuItem = Menu.getApplicationMenu().getMenuItemById('autoStartAcceptingConnectionsMenu');
+
+    // Check the checkbox
+    autoStartMenuItem.checked = true;
+
+    })
+
+
+    ipcMain.on('checkSaveHostIdMenu', async (event,arg) =>{
+
+      const saveHostIdMenuItem = Menu.getApplicationMenu().getMenuItemById('saveHostIdMenu');
+
+      // Check the checkbox
+      saveHostIdMenuItem.checked = true;
+
+      })
+
+      ipcMain.on('checkLaunchAtStartupMenu', async (event,arg) =>{
+
+        const launchAtStartupMenuItem = Menu.getApplicationMenu().getMenuItemById('launchAtStartupMenu');
+
+        // Check the checkbox
+        launchAtStartupMenuItem.checked = true;
+
+        })
+
+        ipcMain.on('openAntMediaWebsite', async(event,arg)=>{
+
+          shell.openExternal("https://www.antmedia.io")
+
+        })
 
   //const menuBuilder = new MenuBuilder(mainWindow);
   //menuBuilder.buildMenu();

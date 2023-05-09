@@ -1,6 +1,10 @@
 import React, { Component } from 'react'
-import { WebRTCAdaptor } from '../js/webrtc_adaptor';
+import { WebRTCAdaptor } from '@antmedia/webrtc_adaptor';
 import logo from '../../../assets/logo.png';
+import antmedialogo from '../../../assets/antmedia_logo.png';
+
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
 
 const STATUS_IDLE = 0
 const STATUS_PREPARING = 1;
@@ -26,16 +30,24 @@ export default class MainComponent extends Component {
       hostId: null,
       webSocketUrl:"ws://localhost:5080/{appName}/websocket or wss://localhost:5443/{appName}/websocket",
       sessionName:"sessionName",
-      controllerSessionIdList : [],
-      autoStartAcceptingConnectionsCheckboxChecked:false,
-      saveHostIdCheckboxChecked:false
+      turnServerUrl:"turn:turn.example.com:3478",
+      turnServerUsername:"",
+      turnServerPassword:"",
+      controllerIdList : [],
+     // autoStartAcceptingConnectionsCheckboxChecked:false,
+      showTurnConfigurationDialog:false
 
     }
     this.hostId =  null;
-    this.webRTCAdaptor = null;
+    this.dataChannelWebRtcAdaptor = null;
+    this.screenPublisherWebRtcAdaptor = null;
     this.streamId = null;
     this.publishing = false;
     this.logBoxRef = React.createRef()
+    this.saveHostIdCheckboxChecked = false;
+    this.autoStartAcceptingConnectionsCheckboxChecked = false;
+    this.iceServers = [{'urls': 'stun:stun1.l.google.com:19302'}]
+
   }
 
 
@@ -43,13 +55,83 @@ export default class MainComponent extends Component {
     return Math.floor(100000 + Math.random() * 900000);
   }
 
-   initWebRTCAdaptor = () => {
-    console.log("init webrtc adaptor")
-      this.webRTCAdaptor = new WebRTCAdaptor({
+   initDataChannelWebRtcAdaptor = ()=> {
+
+    console.log("init data channel webrtc adaptor")
+    console.log(this.state.turnServerUrl)
+      this.dataChannelWebRtcAdaptor = new WebRTCAdaptor({
+      websocket_url: this.state.webSocketUrl,
+      onlyDataChannel:true,
+      peerconnection_config: {
+          'iceServers': this.iceServers
+      },
+      callback: (info,obj) => {
+        console.log(info)
+        console.log(obj)
+        if (info == "initialized") {
+            console.log("initialized");
+
+            if(this.hostId == null || this.saveHostIdCheckboxChecked == false){
+              this.hostId = this.generateId()
+              this.setState({hostId:this.hostId})
+
+
+            }
+            if(this.saveHostIdCheckboxChecked){
+              console.log("saving host id...")
+              this.save("hostId", this.hostId)
+            }
+            console.log("STARTING DATA CHANNEL PUBLISH!")
+
+            this.dataChannelWebRtcAdaptor.publish(this.hostId.toString());
+
+           /*  this.webRTCAdaptor.createRdcSession(this.state.sessionName, this.hostId)
+            this.setState({status:STATUS_READY})
+            this.addLog("Waiting for connections.")
+
+            this.save("webSocketUrl",this.state.webSocketUrl)
+            this.save("sessionName",this.state.sessionName)
+
+
+            console.log("set status to ready!") */
+        }
+        else if(info == "data_received"){
+          this.onRemoteDesktopControlEvent(obj.data)
+        }else if(info == 'data_channel_opened'){
+          this.setState({status:STATUS_READY})
+          this.addLog("Waiting for connections.")
+
+          this.save("webSocketUrl",this.state.webSocketUrl)
+          this.save("sessionName",this.state.sessionName)
+
+        }
+  },
+  callbackError: (error,message) => {
+    //some possible errors, NotFoundError, SecurityError,PermissionDeniedError
+    console.log(message)
+
+
+    if (error.indexOf("no_stream_exist") != -1) {
+      console.log("no stream exists will create channel!")
+      /* if no stream exist, create the channel*/
+    //  createChannel();
+    }
+
+  }
+  });
+
+
+
+   }
+
+   initScreenPublisherWebrtcAdaptor = () =>{
+    console.log("init screen publisher webrtc adaptor")
+
+    this.screenPublisherWebRtcAdaptor = new WebRTCAdaptor({
       websocket_url: this.state.webSocketUrl,
       mediaConstraints: mediaConstraints,
       peerconnection_config: {
-          'iceServers': [{'urls': 'stun:stun1.l.google.com:19302'}]
+          'iceServers': this.iceServers
       },
       publishMode: "screen",
 
@@ -63,32 +145,8 @@ export default class MainComponent extends Component {
         console.log(obj)
         if (info == "initialized") {
             console.log("initialized");
+            this.startPublishing()
 
-            if(this.hostId == null){
-              this.hostId = this.generateId()
-              this.setState({hostId:this.hostId})
-              if(this.state.saveHostIdCheckboxChecked){
-                this.save("hostId",this.hostId)
-              }
-            }
-
-            this.webRTCAdaptor.createRdcSession(this.state.sessionName, this.hostId)
-            this.setState({status:STATUS_READY})
-            this.addLog("Waiting for connections.")
-
-            this.save("webSocketUrl",this.state.webSocketUrl)
-            this.save("sessionName",this.state.sessionName)
-
-            console.log("set status to ready!")
-        }else if(info == "startRdc"){
-          console.log("START REMOTE DESKTOP CONTROL CAME!")
-          var controllerSessionId =  obj.rdcControllerSessionId
-          this.onControllerStartRemoteDesktopControl(controllerSessionId)
-
-        }else if(info == "rdcControllerStopped"){
-          console.log("START REMOTE DESKTOP CONTROL CAME!")
-          var controllerSessionId =  obj.rdcControllerSessionId
-          this.onControllerStopRemoteDesktopControl(controllerSessionId)
         }
         else if(info == "publish_started"){
           this.onPublishStarted()
@@ -109,51 +167,79 @@ export default class MainComponent extends Component {
   }
   });
 
-  //webRTCAdaptor.publish("qwe")
-   // window.webRTCAdaptor = webRTCAdaptor;
+  if(this.state.turnServerUrl != ''){
+    this.addTurnServerToWebrtcAdaptor()
   }
 
+  //webRTCAdaptor.publish("qwe")
+   // window.webRTCAdaptor = webRTCAdaptor;
 
 
+
+
+
+
+
+
+   }
+
+   createChannel = () =>{
+
+      this.dataChannelWebRtcAdaptor.publish(this.hostId); // create data channel with host id.
+
+    }
 
 
 startPublishing = () => {
-  console.log("STARTING TO PUBLISH!")
- this.streamId = this.generateId().toString()
-this.webRTCAdaptor.publish(this.streamId)
+
+console.log("STARTING TO PUBLISH!")
+this.streamId = this.generateId().toString()
+this.screenPublisherWebRtcAdaptor.publish(this.streamId)
 
 }
 
-onControllerStartRemoteDesktopControl = (controllerSessionId) =>{
+
+
+
+
+
+
+onControllerStartRemoteDesktopControl = (controllerId) =>{
 console.log("REMOTE DESKTOP CONTROL REQUEST CAME!")
-console.log(controllerSessionId)
-this.state.controllerSessionIdList.push(controllerSessionId);
-this.addLog("Controller has been connected with session id: "+ controllerSessionId)
-this.setState({ controllerSessionIdList:this.state.controllerSessionIdList })
+console.log(controllerId)
+this.state.controllerIdList.push(controllerId);
+this.addLog("Controller has been connected session id: "+ controllerId)
+this.setState({ controllerIdList:this.state.controllerIdList })
 
 
 if(!this.publishing){
-  this.startPublishing()
+  this.initScreenPublisherWebrtcAdaptor()
 
 }else{
-  this.webRTCAdaptor.setRdcStreamIdOnController(controllerSessionId, this.streamId, this.hostId)
+
+  var jsCmd = {
+    command : "setRdcStreamId",
+    rdcStreamId : this.streamId.toString(),
+    rdcControllerId : controllerId,
+};
+
+
+  this.sendDataThroughDataChannel(JSON.stringify(jsCmd))
+
 
 }
-//this.setState({status:STATUS_CONTROLLER_CONNECTING})
 
 }
 
-onControllerStopRemoteDesktopControl = (controllerSessionId) =>{
+onControllerStopRemoteDesktopControl = (controllerId) =>{
   console.log("REMOTE DESKTOP CONTROL STOP CONTROLLER")
-  console.log(controllerSessionId)
-  var controllerIndex = this.state.controllerSessionIdList.indexOf(controllerSessionId);
+  console.log(controllerId)
+  var controllerIndex = this.state.controllerIdList.indexOf(controllerId);
   if (controllerIndex !== -1) {
-  this.state.controllerSessionIdList.splice(controllerIndex, 1);
+  this.state.controllerIdList.splice(controllerIndex, 1);
   }
-  this.addLog("Controller has been disconnected with session id: "+ controllerSessionId)
-  this.setState({ controllerSessionIdList:this.state.controllerSessionIdList })
-
-  //this.setState({status:STATUS_CONTROLLER_CONNECTING})
+  this.addLog("Controller has been disconnected with session id: "+ controllerId)
+  this.setState({ controllerIdList:this.state.controllerIdList })
 
 }
 
@@ -161,6 +247,71 @@ onControllerStopRemoteDesktopControl = (controllerSessionId) =>{
 getStorage = () =>{
 
  window.electron.ipcRenderer.sendMessage('getStorage');
+
+}
+
+checkAutoStartAcceptingConnectionsMenu = () =>{
+
+  window.electron.ipcRenderer.sendMessage('checkAutoStartAcceptingConnectionsMenu');
+
+
+}
+
+
+checkSaveHostIdMenu = () =>{
+
+  window.electron.ipcRenderer.sendMessage('checkSaveHostIdMenu');
+
+
+}
+
+checkLaunchAtStartupMenu = () =>{
+  window.electron.ipcRenderer.sendMessage('checkLaunchAtStartupMenu');
+
+
+}
+
+saveTurnServerCredentials = ()=>{
+  console.log("save turn server credentials called!")
+
+  const regex = new RegExp('^(turn|turns):[\\w.-]+(?::\\d+)?$');
+
+  console.log(this.state.turnServerUrl)
+
+  if (regex.test( this.state.turnServerUrl)) {
+    this.save('turnServerUrl', this.state.turnServerUrl)
+    this.save('turnServerUsername',this.state.turnServerUsername)
+    this.save('turnServerPassword',this.state.turnServerPassword)
+
+    this.addTurnServerToWebrtcAdaptor()
+
+    this.setState({showTurnConfigurationDialog:false})
+
+    alert("Turn server saved.")
+    this.addLog("Turn server added.")
+
+  } else {
+    alert('Invalid TURN server URL');
+  }
+
+
+
+
+
+
+
+}
+
+addTurnServerToWebrtcAdaptor = () =>{
+
+  var creds = {
+    'urls': this.state.turnServerUrl,
+    'username':this.state.turnServerUsername,
+    'credential':this.state.turnServerPassword
+  }
+  this.iceServers.push(creds)
+
+
 
 }
 
@@ -179,37 +330,78 @@ onPublishStarted = () => {
   setTimeout(() => {
     console.log("sending stream id!")
     console.log(this.streamId)
-    for(var i=0;i<this.state.controllerSessionIdList.length;i++){
-      var controllerSessionId = this.state.controllerSessionIdList[i]
-      this.webRTCAdaptor.setRdcStreamIdOnController(controllerSessionId, this.streamId, this.hostId) // actually no need to send this.hostId here. it can be stored on server and can be retrieved there too. but its required atm.
+    for(var i=0;i<this.state.controllerIdList.length;i++){
+      var controllerId = this.state.controllerIdList[i]
+      var jsCmd = {
+        command : "setRdcStreamId",
+        rdcStreamId : this.streamId.toString(),
+        rdcControllerId : controllerId,
+    };
+    this.sendDataThroughDataChannel(JSON.stringify(jsCmd))
+
     }
+
+
+
+
 
   }, 1000)
 
 
 }
 
-onRemoteDesktopControlEvent = (controlEvent) => {
+sendDataThroughDataChannel = (data) =>{ // data is string
+
+  try {
+			var iceState = this.dataChannelWebRtcAdaptor.iceConnectionState(this.hostId);
+            if (iceState != null && iceState != "failed" && iceState != "disconnected") {
+
+        this.dataChannelWebRtcAdaptor.sendData(this.hostId,data);
+
+			}
+			else {
+				alert("");
+			}
+		}
+		catch (exception) {
+			console.error(exception);
+			alert("Message cannot be sent. Make sure you've enabled data channel on server web panel");
+		}
+
+
+}
+
+onRemoteDesktopControlEvent = (controlEvent) =>{
+  console.log("on remote desktop control event!!")
   controlEvent = JSON.parse(controlEvent)
-  console.log("ON REMOTE DESKTOP CONTROL EVENT!")
+
   console.log(controlEvent)
+  var command = controlEvent.command
+  var type = controlEvent.type
+   if(command == "startRdc"){
+    console.log("START REMOTE DESKTOP CONTROL CAME!")
+    var controllerId =  controlEvent.rdcControllerId
+    console.log(controllerId)
+    this.onControllerStartRemoteDesktopControl(controllerId)
 
-if(controlEvent.type == "controlAction"){
-  this.sendControlEventToElectronForExecution(controlEvent.event)
+  }else if(command == "rdcStopControlling"){
+    console.log("START REMOTE DESKTOP CONTROL CAME!")
+    var controllerId =  controlEvent.rdcControllerId
+    this.onControllerStopRemoteDesktopControl(controllerId)
+  }else if(type == "controlAction"){
+
+    this.sendControlEventToElectronForExecution(controlEvent.event)
+
+  }
 
 }
 
-
-}
 
 sendControlEventToElectronForExecution = (event) =>{
  console.log("SEND CONTROL EVENT TO ELECTRON FOR EXECUTION!")
  var eventStr = JSON.stringify(event)
-  console.log(eventStr)
-
+ console.log(eventStr)
  window.electron.ipcRenderer.sendMessage('controlEvent', eventStr);
-
-
 }
 
 save = (key,value)=>{
@@ -238,6 +430,19 @@ componentDidMount(){
       var autoStartAcceptingConnections = this.storageData.autoStartAcceptingConnections
       var hostId = this.storageData.hostId
       var constantHostId = this.storageData.constantHostId
+      var turnServerUrl = this.storageData.turnServerUrl
+      var turnServerUsername = this.storageData.turnServerUsername
+      var turnServerPassword = this.storageData.turnServerPassword
+      var launchAtStartup = this.storageData.launchAtStartup
+
+      if(turnServerUsername == ''){
+        turnServerUsername = "test"
+      }
+
+      if(turnServerPassword == ''){
+        turnServerPassword = "test"
+      }
+
 
       if(webSocketUrl != undefined){
         this.setState({webSocketUrl:webSocketUrl})
@@ -246,10 +451,37 @@ componentDidMount(){
         this.setState({sessionName:sessionName})
       }
 
+      if(turnServerUrl != undefined){
+
+        this.setState({turnServerUrl:turnServerUrl,turnServerUsername:turnServerUsername,turnServerPassword:turnServerPassword})
+
+      }
+
+      if(hostId != undefined && constantHostId == true){
+
+        this.checkSaveHostIdMenu()
+
+
+        this.hostId = hostId
+        this.saveHostIdCheckboxChecked = true
+
+        this.setState({hostId:this.hostId})
+      }
+
+      if(launchAtStartup == true){
+
+        this.checkLaunchAtStartupMenu()
+      }
+
       if(autoStartAcceptingConnections != undefined && webSocketUrl!= undefined && autoStartAcceptingConnections == true){
 
+
+        this.checkAutoStartAcceptingConnectionsMenu()
+
+
+
         this.setState({
-          autoStartAcceptingConnectionsCheckboxChecked: true, webSocketUrl:webSocketUrl
+          webSocketUrl:webSocketUrl, turnServerUrl:turnServerUrl,turnServerUsername:turnServerUsername,turnServerPassword:turnServerPassword
         },()=>{
           this.startAcceptingConnections()
 
@@ -258,14 +490,49 @@ componentDidMount(){
 
       }
 
-      if(hostId != undefined && constantHostId == true){
-        this.hostId = hostId
-        this.setState({hostId:this.hostId,saveHostIdCheckboxChecked:true})
-      }
+
+
+
 
     }
 
   });
+
+  window.electron.ipcRenderer.on('enableTurn', (arg) => {
+
+
+    console.log("ENABLE TURN CALLED!")
+    this.setState({showTurnConfigurationDialog:true})
+
+  })
+
+  window.electron.ipcRenderer.on('saveHostId', (arg)=>{
+
+    console.log(arg)
+    this.saveHostIdCheckboxCheckHandler(arg)
+
+
+
+  })
+
+
+  window.electron.ipcRenderer.on('autoStartAcceptingConnections',(arg)=>{
+
+    console.log(arg)
+    this.autoStartAcceptingConnectionsCheckboxCheckHandler(arg)
+
+
+
+  })
+
+  window.electron.ipcRenderer.on('launchAtStartup',(arg)=>{
+
+    console.log(arg)
+    this.launchAtStartupCheckboxCheckHandler(arg)
+
+
+
+  })
 
 
 
@@ -305,6 +572,18 @@ handleWebSocketUrlInput = (event) =>{
 
 }
 
+handleTurnServerUrlInput = (event) =>{
+  this.setState({turnServerUrl: event.target.value});
+}
+
+handleTurnServerUsernameInput = (event) =>{
+  this.setState({turnServerUsername: event.target.value});
+}
+
+handleTurnServerPasswordInput = (event) =>{
+  this.setState({turnServerPassword: event.target.value});
+}
+
 handleSessionNameInput = (event) =>{
 
   this.setState({sessionName: event.target.value});
@@ -333,10 +612,10 @@ addLog = (logText) =>{
 renderControllerList = () => {
   return (
     <div>
-      <span>Controller List({this.state.controllerSessionIdList.length}):</span>
-      {this.state.controllerSessionIdList.map((controllerSessionId) => (
-        <div key={controllerSessionId + Math.random()} style={{ display: "flex" }}>
-          <span style={{ color: "white", fontSize: "14px" }}>Controller: {controllerSessionId}</span>
+      <span>Controller List({this.state.controllerIdList.length}):</span>
+      {this.state.controllerIdList.map((controllerId) => (
+        <div key={controllerId + Math.random()} style={{ display: "flex" }}>
+          <span style={{ color: "white", fontSize: "14px" }}>Controller: {controllerId}</span>
         </div>
       ))}
     </div>
@@ -351,9 +630,7 @@ startAcceptingConnections = ()=> {
 
   this.setState({status: STATUS_PREPARING});
 
-
-  this.initWebRTCAdaptor(false)
-
+  this.initDataChannelWebRtcAdaptor()
 
 }
 
@@ -365,7 +642,9 @@ stopAcceptingConnections = ()=> {
   this.publishing = false;
 
   this.setState({status: STATUS_IDLE, controllerSessionIdList:[]});
-  this.webRTCAdaptor.closeWebSocket()
+
+  this.dataChannelWebRtcAdaptor.closeWebSocket()
+
   this.addLog("Disconnected from Ant Media Server")
 
 }
@@ -373,14 +652,25 @@ stopAcceptingConnections = ()=> {
 
 finishSession = () =>{
 
-this.webRTCAdaptor.stop(this.streamId)
+this.screenPublisherWebRtcAdaptor.stop(this.streamId)
 this.addLog("Session finished.")
 this.publishing = false;
-this.setState({status: STATUS_IDLE, controllerSessionIdList:[]});
-this.webRTCAdaptor.finishRdcSession(this.hostId)
+this.setState({status: STATUS_IDLE, controllerIdList:[]});
+
+var jsCmd = {
+  command : "rdcFinish",
+
+};
+this.sendDataThroughDataChannel(JSON.stringify(jsCmd))
+
+
+this.dataChannelWebRtcAdaptor.closeWebSocket()
+this.screenPublisherWebRtcAdaptor.closeWebSocket()
+
 
 }
 
+//not used this checkbox moved to top menu.
 renderAutoStartAcceptingConnectionsCheckBox = ()=> {
 
   return(
@@ -401,35 +691,44 @@ renderSaveHostIdCheckBox = ()=>{
 
 }
 
-saveHostIdCheckboxCheckHandler = ()=>{
+saveHostIdCheckboxCheckHandler = (checked)=>{
 
-  this.setState({
-    saveHostIdCheckboxChecked: !this.state.saveHostIdCheckboxChecked,
-  }, ()=>{
-    this.save("constantHostId",this.state.saveHostIdCheckboxChecked)
+  console.log("save host id checkbox check handler called!")
+  console.log(checked)
+  this.saveHostIdCheckboxChecked = checked
 
-  })
+  if(checked && this.hostId != null){
+    this.save("hostId", this.hostId)
 
+  }
+
+  this.save("constantHostId", this.saveHostIdCheckboxChecked)
+
+
+
+}
+
+//not used. this checkbox moved to top menu.
+autoStartAcceptingConnectionsCheckboxCheckHandler  = (checked) =>{
+  console.log("auto start accepting connections checkbox check handler called!")
+
+  console.log(checked)
+
+  this.autoStartAcceptingConnectionsCheckboxChecked = checked
+  this.save("autoStartAcceptingConnections", this.autoStartAcceptingConnectionsCheckboxChecked)
 
 
 
 }
 
-autoStartAcceptingConnectionsCheckboxCheckHandler  = () =>{
-  console.log("HANDLER CALLED!")
-  console.log(this.state.autoStartAcceptingConnectionsCheckboxChecked)
-  this.setState({
-    autoStartAcceptingConnectionsCheckboxChecked: !this.state.autoStartAcceptingConnectionsCheckboxChecked,
-  },() => {
-    console.log(this.state.autoStartAcceptingConnectionsCheckboxChecked)
-    this.save("autoStartAcceptingConnections", this.state.autoStartAcceptingConnectionsCheckboxChecked)
+launchAtStartupCheckboxCheckHandler  = (checked) =>{
 
-   console.log("SAVINGGG")
-});;
+  this.launchAtStartup = checked
+  this.save("launchAtStartup", checked)
+
 
 
 }
-
 
 renderActionButton = () =>{
 
@@ -470,22 +769,76 @@ renderShareYourHostIdWithControllerText = () => {
 
 }
 
+handleTurnConfigurationDialogClose = ()=> {
+
+  this.setState({showTurnConfigurationDialog:false})
+
+}
+
+renderTurnConfigurationDialog = ()=>{
+if(this.state.showTurnConfigurationDialog){
+  return(
+    <div>
+
+  <Dialog
+
+
+  onClose={this.handleTurnConfigurationDialogClose}
+
+    open={true}
+    >
+              <DialogContent>
+
+                <div style={{display:'flex',flexDirection:'column',background:'white'}}>
+          <h1 color='white'>Turn Server Configuration</h1>
+          <span>Turn server is not required. By default google stun is used.</span>
+          <input type="text" style={{width:"200px",marginTop:"5px"}} placeholder='turn server url' value={this.state.turnServerUrl} onChange={this.handleTurnServerUrlInput} />
+          <input type="text" style={{width:"150px",marginTop:"5px"}} placeholder='turn server username'  value={this.state.turnServerUsername} onChange={this.handleTurnServerUsernameInput} />
+          <input type="text" style={{width:"150px",marginTop:"5px"}} placeholder='turn server password' value={this.state.turnServerPassword} onChange={this.handleTurnServerPasswordInput} />
+          <button onClick={()=>this.saveTurnServerCredentials()} style={{backgroundColor:'#007BFF',marginTop:'10px','color':'white'}}>Save</button>
+
+                </div>
+
+        </DialogContent>
+
+  </Dialog>
+
+
+    </div>
+  )
+
+
+}
+
+
+
+
+}
+
+openAntMediaWebsite = ()=> {
+
+  window.electron.ipcRenderer.sendMessage('openAntMediaWebsite');
+
+}
+
   render() {
 
 
     return (
-      <div style={{color: "#FFFFFF",fontSize:"16px"}}>
+      <div style={{marginTop:'25px',color: "#FFFFFF",fontSize:"16px"}}>
 
         <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
         <img width="250px" alt="icon" src={logo} />
 
-        <input type="text" style={{width:"400px"}}  value={this.state.webSocketUrl} onChange={this.handleWebSocketUrlInput} />
-        <input type="text" style={{width:"200px",marginTop:"5px"}}  value={this.state.sessionName} onChange={this.handleSessionNameInput} />
+        <input type="text" style={{width:"400px",marginTop:"20px"}} placeholder='web socket url (example:ws://localhost:5080/tunadesk/websocket)' value={this.state.webSocketUrl} onChange={this.handleWebSocketUrlInput} />
+
+        <input type="text" style={{width:"200px",marginTop:"5px"}} placeholder='session name' value={this.state.sessionName} onChange={this.handleSessionNameInput} />
 
 <div style={{marginTop:"15px"}}>
 {this.renderStatusText()}
 
 </div>
+
 <div style={{marginTop:"15px"}}>
 {this.renderHostId()}
 
@@ -496,21 +849,11 @@ renderShareYourHostIdWithControllerText = () => {
 <div style={{marginTop:"15px",display:"flex",flexDirection:"column"}}>
 <span>Event Log</span>
 <textarea readOnly ref={this.logBoxRef} style={{    height:"75px",
-    width:"400px", overflowY: "auto"}}  id="logTextBox" value={this.state.log}></textarea>
+    width:"400px", overflowY: "auto",fontFamily
+    :"Danzza"}}  id="logTextBox" value={this.state.log}></textarea>
 
 </div>
-<div style={{display:"flex",justifyContent:"center"}}>
-<div style={{display:"flex",flexDirection:"column"}}>
-<span>Auto start accepting connections on app startup</span>
 
-  {this.renderAutoStartAcceptingConnectionsCheckBox()}
-</div>
-<div style={{display:"flex",flexDirection:"column",marginLeft:"10px"}}>
-<span>Save hostId</span>
-
-  {this.renderSaveHostIdCheckBox()}
-</div>
-</div>
 
 
 <div style={{marginTop:"15px"}}>
@@ -520,6 +863,14 @@ renderShareYourHostIdWithControllerText = () => {
 <div style={{marginTop:"5px"}}>
 {this.renderShareYourHostIdWithControllerText()}
 </div>
+
+        </div>
+
+        {this.renderTurnConfigurationDialog()}
+        <div onClick={() => this.openAntMediaWebsite()} style={{cursor:'pointer',display:"flex",alignItems:'center',position: 'fixed',left:'50%',  bottom: '5px', transform:'translate(-50%, -50%)',margin:'margin: 0 auto'
+}}>
+        <span>by</span>
+        <img style={{marginLeft:'10px'}} width="100px" alt="icon" src={antmedialogo} />
 
         </div>
 
