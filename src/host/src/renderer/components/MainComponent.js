@@ -30,7 +30,7 @@ export default class MainComponent extends Component {
       hostId: null,
       webSocketUrl:"ws://localhost:5080/{appName}/websocket or wss://localhost:5443/{appName}/websocket",
       sessionName:"sessionName",
-      turnServerUrl:"turn:turn.example.com:3478",
+      turnServerUrl:"",
       turnServerUsername:"",
       turnServerPassword:"",
       controllerIdList : [],

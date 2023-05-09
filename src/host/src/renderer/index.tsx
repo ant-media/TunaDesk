@@ -16,7 +16,6 @@ navigator.mediaDevices.getDisplayMedia = async () => {
 
   const selectedSource = await globalThis.myCustomGetDisplayMedia();
   console.log("asddsjsdfjksdfjkdsl")
-  console.log(selectedSource)
   // create MediaStream
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
@@ -27,7 +26,6 @@ navigator.mediaDevices.getDisplayMedia = async () => {
       },
     },
   });
-  console.log(stream)
   return stream;
 };
 

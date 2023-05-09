@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title>TunaDesk</title>
+<title>WebRTC Samples > Play</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
 <link rel="stylesheet" href="css/external/bootstrap4/bootstrap.min.css" />
 <script src="js/external/adapter-latest.js"></script>
 <link rel="stylesheet" href="css/samples.css" />
 <link rel="stylesheet" href="css/common.css" />
+
 <style>
 
 #video-overlay {
@@ -22,6 +23,10 @@
 	width: 25%;
 }
 
+video::-webkit-media-controls {
+  display:none !important;
+}
+
 </style>
 </head>
 <body>
@@ -29,7 +34,7 @@
 	<div class="container">
 		<div class="header clearfix">
 			<div class="row">
-				<h3 class="col text-muted">TunaDesk: Remote Desktop Control Tool</h3>
+				<h3 class="col text-muted">TunaDesk: Remote Desktop Control</h3>
 			</div>
 		</div>
 
@@ -43,11 +48,20 @@
 				<div id='video-overlay'>
 					<img src="images/loading.gif" />
 				</div>
-				<video id="remoteVideo" autoplay controls playsinline ></video>
+				<video id="remoteVideo" autoplay  playsinline ></video>
+
+			</div>
+			<div style="display: flex;margin-top: 10px;margin-bottom: 10px;">
+					<button class="btn btn-primary"
+						id="toggle_audio_button">Mute</button>
+					<button class="btn btn-primary" style="margin-left: 10px;"
+						id="fullscreen_button">Fullscreen</button>
+
 			</div>
 			<div class="form-group col-sm-12 text-left">
 				<input type="text" class="form-control"
 					id="hostIdInput" placeholder="Type host id">
+					
 			</div>
 
 			
@@ -97,10 +111,13 @@
 <script type="module">
 	import {WebRTCAdaptor} from "./js/webrtc_adaptor.js"
 	import {getUrlParameter} from "./js/fetch.stream.js"
+	import {generateRandomString} from "./js/utility.js"
 
 
 	var token = getUrlParameter("token");
-    
+    var mouseDown = false
+	var clickDisabled = false
+
 
 	$(function() {
 	  var id = getUrlParameter("id");
@@ -119,7 +136,9 @@
 	});		
 	var start_control_button = document.getElementById("start_control_button");
 	//start_play_button.addEventListener("click", startPlaying, false)
-	start_control_button.addEventListener("click", sendStartRemoteDesktopControl, false)
+	start_control_button.addEventListener("click", connectDataChannel, false)
+	toggle_audio_button.addEventListener("click", toggleAudio, false)
+	fullscreen_button.addEventListener("click",toggleFullscreen, false)
 	var stop_control_button = document.getElementById("stop_control_button");
 	stop_control_button.addEventListener("click",sendStopRemoteDesktopControl,false);
 
@@ -128,6 +147,8 @@
 
 	var streamId;
 	var hostId;
+	var controllerId;
+	var startRemoteDesktopControlSent = false;
 	
 	function toggleOptions() {
 		$(".options").toggle();
@@ -135,10 +156,11 @@
 
 	function sendData(event) {
 		try {
-			var iceState = webRTCAdaptor.iceConnectionState(streamId);
+			var iceState = webRTCAdaptor.iceConnectionState(hostId);
             if (iceState != null && iceState != "failed" && iceState != "disconnected") {
-            
-				webRTCAdaptor.sendData(streamId, JSON.stringify(event));
+				console.log("----------SENDING DATA--------")
+				console.log(hostId)
+				webRTCAdaptor.sendData(hostId, JSON.stringify(event));
 			}
 			else {
 				//alert("WebRTC playing is not active. Please click Start Playing first")
@@ -151,19 +173,76 @@
 	}
 	
 	function startPlaying() {
+		console.log("starting to play "+ streamId)
 		webRTCAdaptor.play(streamId, token, "", []);
 	}
 
-	function sendStartRemoteDesktopControl() {
-		console.log("SEND START REMOTE DESKTOP CONTROL")
-		var hostId = hostIdBox.value
-		webRTCAdaptor.sendStartRemoteDesktopControl(hostId)
+	function connectDataChannel(){
+		hostId = hostIdBox.value;
+		webRTCAdaptor.play(hostId)
+
+
+
 
 
 	}
 
+	function sendStartRemoteDesktopControl() {
+		
+		console.log("SEND START REMOTE DESKTOP CONTROL")
+		if(controllerId == undefined){
+			controllerId = generateRandomString(4)
+
+		}
+
+		var jsCmd = {
+			rdcControllerId: controllerId,
+            command: "startRdc",
+        };
+		 hostId = hostIdBox.value
+
+
+		 sendData(jsCmd)
+		 startRemoteDesktopControlSent = true;
+
+
+	}
+	
+	function toggleAudio(){
+		var remoteVideo=document.getElementById("remoteVideo");
+		var toggleAudioButton = document.getElementById("toggle_audio_button")
+		remoteVideo.muted = !remoteVideo.muted;
+		if(remoteVideo.muted){
+			toggleAudioButton.innerHTML ="Unmute"
+		}else{
+			toggleAudioButton.innerHTML = "Mute"
+		}
+
+	}
+
+	function toggleFullscreen(){
+		var elem = document.getElementById("remoteVideo");
+if (elem.requestFullscreen) {
+  elem.requestFullscreen();
+} else if (elem.mozRequestFullScreen) {
+  elem.mozRequestFullScreen();
+} else if (elem.webkitRequestFullscreen) {
+  elem.webkitRequestFullscreen();
+} else if (elem.msRequestFullscreen) { 
+  elem.msRequestFullscreen();
+}
+
+	}
 	function sendStopRemoteDesktopControl() {
-		webRTCAdaptor.sendStopRemoteDesktopControl(hostId)
+		var jsCmd = {
+            command: "rdcStopControlling",
+			rdcControllerId:controllerId
+        };
+
+		sendData(jsCmd)
+
+		webRTCAdaptor.stop(hostId)
+		startRemoteDesktopControlSent = false;
 		webRTCAdaptor.stop(streamId);
 	}
 
@@ -181,6 +260,7 @@
 	}
 
 	var remoteVideo = document.getElementById("remoteVideo");
+	
 	remoteVideo.addEventListener("mousemove", function (event) {
 		//clientWidth and clientHeight are the width and height(in pixels) that video tag takes places in the screen 
 		//videoWidth and videoHeight are the width/height of the incoming video
@@ -228,7 +308,25 @@
 
 		var eventXRatio = (event.offsetX - offsetXStart) / videoClientOccupiedWidth;
 		var eventYRatio = (event.offsetY - offsetYStart) / videoClientOccupiedHeight;
-		var mousemoveEvent = {
+
+		if(mouseDown){
+			var mouseDragEvent = {
+			event: "mousedrag",
+			x: eventXRatio,
+			y: eventYRatio
+		}
+		 event = {
+			"type" :"controlAction",
+			"event":mouseDragEvent
+		}
+		sendData(event);
+		console.log("mousedrag event:");
+		console.log(mouseDragEvent);
+
+
+
+		}else{
+			var mousemoveEvent = {
 			event: "mousemove",
 			x: eventXRatio,
 			y: eventYRatio
@@ -240,6 +338,36 @@
 		sendData(event);
 		console.log("mousemove event:");
 		console.log(mousemoveEvent);
+		}
+		
+
+	});
+
+	document.addEventListener("keydown", (event) => {
+		
+
+		var keydownEvent = {
+			event: "keydown",
+			key: event.key,
+			shiftKey: event.shiftKey,
+			ctrlKey: event.ctrlKey,
+            altKey: event.altKey
+		}
+		var event = {
+			"type" :"controlAction",
+			"event":keydownEvent
+		}
+		console.log("keydown event:")
+		console.log(keydownEvent);
+		sendData(event);
+		if (event.key == "Enter") {
+			event.preventDefault();
+			//event.stopPropagation();
+			//Workaround solution to continue play
+			//I think keypress up may be a solution for this problem
+			remoteVideo.play();
+		}
+		
 	});
 
 	remoteVideo.addEventListener("click", function(event){
@@ -271,8 +399,51 @@
 			"type" :"controlAction",
 			"event":clickEvent
 		}
-		sendData(event);
+		if(clickDisabled){
+			clickDisabled = false
+		}else{
+			sendData(event);
+
+		}
 	});
+
+	remoteVideo.addEventListener("mousedown",function(event){
+	  mouseDown = true
+		event.preventDefault()
+		var mouseDownData = {
+			event: "mousedown",
+			
+		}
+
+		var event = {
+			"type" :"controlAction",
+			"event":mouseDownData
+		}
+		clickDisabled = true
+		sendData(event);
+
+
+	})
+
+	remoteVideo.addEventListener("mouseup",function(event){
+		mouseDown= false
+
+		event.preventDefault()
+
+
+		var mouseUp = {
+			event: "mouseup",
+			
+		}
+
+		var event = {
+			"type" :"controlAction",
+			"event":mouseUp
+		}
+		sendData(event);
+
+
+	})
 
 	remoteVideo.addEventListener("wheel", function(event){
 		
@@ -287,34 +458,12 @@
 			"type" :"controlAction",
 			"event":wheelEvent
 		}
+		
 		console.log("wheel event:");
 		sendData(event);
 	});
 
-	remoteVideo.addEventListener("keydown", (event) => {
-		var keydownEvent = {
-			event: "keydown",
-			key: event.key,
-			shiftKey: event.shiftKey,
-			ctrlKey: event.ctrlKey,
-            altKey: event.altKey
-		}
-		var event = {
-			"type" :"controlAction",
-			"event":keydownEvent
-		}
-		console.log("keydown event:")
-		console.log(keydownEvent);
-		sendData(event);
-		if (event.key == "Enter") {
-			//event.preventDefault();
-			//event.stopPropagation();
-			//Workaround solution to continue play
-			//I think keypress up may be a solution for this problem
-			remoteVideo.play();
-		}
-		
-	});
+	
 
 	var webRTCAdaptor = new WebRTCAdaptor({
 		websocket_url : websocketURL,
@@ -349,7 +498,12 @@
 					console.log("Connecton closed: "
 							+ JSON.stringify(obj));
 				}
-			} else if (info == "streamInformation") {
+			} else if (info == "data_channel_opened") {
+				if(!startRemoteDesktopControlSent){
+					sendStartRemoteDesktopControl()
+
+				}
+
 
 			}		
 			else if (info == "ice_connection_state_changed") {
@@ -363,13 +517,39 @@
 				 
 			}
 			else if (info == "data_received") {
-				var data = obj.data;
-				if (data instanceof ArrayBuffer) {
-                	handleImageData(data);
-              	}
-			  	else {
-					$("#all-messages").append("Received: " + data + "<br>");
-			  	}
+				console.log("---------DATA RECIEVED-------")
+				var data = JSON.parse(obj.data);
+				console.log(data)
+				
+				if(data.command == "setRdcStreamId"){
+					var localStreamId = data.rdcStreamId
+					streamId = localStreamId;
+					var localControllerId = data.rdcControllerId
+					if(controllerId == localControllerId){
+
+						startPlaying()
+
+
+					}
+					
+				}else if(data.command == "rdcFinish"){
+					webRTCAdaptor.stop(hostId)
+
+					webRTCAdaptor.closeWebSocket()
+					console.log("SESSION FINISHED BY HOST")
+					alert("Remote desktop control session finished by host")
+					startRemoteDesktopControlSent = false;
+					webRTCAdaptor.stop(streamId);
+
+					start_control_button.disabled = false;
+				stop_control_button.disabled = true;
+
+				}
+			
+
+
+
+
 			}
 			else if (info == "bitrateMeasurement") {
 
@@ -389,8 +569,7 @@
 				startPlaying()
 
 			}else if(info == "rdcSessionFinished"){
-				console.log("SESSION FINISHED BY HOST")
-				alert("Remote desktop control session finished by host")
+			
 
 			}
 			else {
@@ -399,9 +578,8 @@
 		},
 		callbackError : function(error) {
 			//some of the possible errors, NotFoundError, SecurityError,PermissionDeniedError
-
-			console.log("error callback: " + JSON.stringify(error));
-			alert(JSON.stringify(error));
+			
+	
 		}
 	});
 
