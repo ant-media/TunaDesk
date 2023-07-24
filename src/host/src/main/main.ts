@@ -15,6 +15,8 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import Storage from './Storage';
+
+const os = require('os');
 var robot = require("@jitsi/robotjs");
 
 // Speed up the mouse.
@@ -41,13 +43,13 @@ const storage = new Storage({configName: 'user-preferences',defaults : {}
 let mainWindow: BrowserWindow | null = null;
 ipcMain.on('save', async(event,arg) =>{
 
-  var keyValueData = JSON.parse(arg)
-  storage.set(keyValueData.key,keyValueData.value)
+  var keyValueData = JSON.parse(arg);
+  storage.set(keyValueData.key,keyValueData.value);
 
 })
 ipcMain.on('getStorage', async(event,arg) =>{
 
-  mainWindow.webContents.send('storage', JSON.stringify(storage.data))
+  mainWindow.webContents.send('storage', JSON.stringify(storage.data));
 
 })
 var openAtLogin = storage.get("openAtLogin")
@@ -90,8 +92,13 @@ ipcMain.on('controlEvent', async (event, arg) => {
     robot.mouseClick(button);
   }else if(controlEventType == "wheel"){
 
-      var deltaX = controlEvent.deltaX
-      var deltaY = controlEvent.deltaY
+    var deltaX = controlEvent.deltaX;
+    var deltaY = controlEvent.deltaY;
+
+    // on Windows, deltaY scrolling is inverted compared to OS X and Linux
+    if(os.platform() === "win32") {
+      deltaY = -deltaY;
+    }
 
     robot.scrollMouse(deltaX, deltaY);
 
