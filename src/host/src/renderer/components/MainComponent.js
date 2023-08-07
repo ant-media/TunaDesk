@@ -399,6 +399,8 @@ onRemoteDesktopControlEvent = (controlEvent) =>{
 
 sendControlEventToElectronForExecution = (event) =>{
  console.log("SEND CONTROL EVENT TO ELECTRON FOR EXECUTION!")
+ event.screenWidth = screen.width;
+ event.screenHeight = screen.height;
  var eventStr = JSON.stringify(event)
  console.log(eventStr)
  window.electron.ipcRenderer.sendMessage('controlEvent', eventStr);

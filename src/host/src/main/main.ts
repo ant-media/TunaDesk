@@ -64,13 +64,13 @@ app.setLoginItemSettings({
 ipcMain.on('controlEvent', async (event, arg) => {
 
 
-  var controlEvent = JSON.parse(arg)
-  var controlEventType = controlEvent.event
+  var controlEvent = JSON.parse(arg);
+  var controlEventType = controlEvent.event;
 
   if (controlEventType == "mousemove") {
-    var mouseX = parseInt(controlEvent.x * robot.getScreenSize().width);
-    var mouseY = parseInt(controlEvent.y * robot.getScreenSize().height);
-    console.log("mouse x: " + mouseX + " mouse y: " + mouseY + " screen size:" + robot.getScreenSize().width + "x" + robot.getScreenSize().height);
+    var mouseX = parseInt(controlEvent.x * controlEvent.screenWidth);
+    var mouseY = parseInt(controlEvent.y * controlEvent.screenHeight);
+    console.log("mouse x: " + mouseX + " mouse y: " + mouseY + " screen size:" + controlEvent.screenWidth + "x" + controlEvent.screenHeight);
     robot.moveMouse(mouseX, mouseY);
   }
   else if (controlEventType == "click") {
@@ -102,10 +102,10 @@ ipcMain.on('controlEvent', async (event, arg) => {
 
   }
   else if(controlEventType == "mousedrag"){
-    console.log("recieved mouse drag!!")
-    var mouseX = parseInt(controlEvent.x * robot.getScreenSize().width);
-    var mouseY = parseInt(controlEvent.y * robot.getScreenSize().height);
-    console.log("mouse x: " + mouseX + " mouse y: " + mouseY + " screen size:" + robot.getScreenSize().width + "x" + robot.getScreenSize().height);
+    console.log('recieved mouse drag!!');
+    var mouseX = parseInt(controlEvent.x * controlEvent.screenWidth);
+    var mouseY = parseInt(controlEvent.y * controlEvent.screenHeight);
+    console.log("mouse x: " + mouseX + " mouse y: " + mouseY + " screen size:" + controlEvent.screenWidth + "x" + controlEvent.screenHeight);
     robot.dragMouse(mouseX, mouseY);
 
   }
