@@ -261,6 +261,8 @@ if (elem.requestFullscreen) {
 
 	var remoteVideo = document.getElementById("remoteVideo");
 
+	remoteVideo.style.cursor = 'none';
+
 	remoteVideo.addEventListener('contextmenu', (event) => {
 		// it captures right click
 		var clickEvent = {
