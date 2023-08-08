@@ -61,17 +61,17 @@ video::-webkit-media-controls {
 			<div class="form-group col-sm-12 text-left">
 				<input type="text" class="form-control"
 					id="hostIdInput" placeholder="Type host id">
-					
+
 			</div>
 
-			
+
 				<div class="form-group">
 					<button class="btn btn-primary"
 						id="start_control_button">Start Controlling</button>
 					<button class="btn btn-primary"
 						id="stop_control_button">Stop Controlling</button>
 				</div>
-				
+
 				<div class="col-sm-10 offset-sm-1" id="stats_panel" style="display: none;">
 					<div class="row text-muted text-left">
 						<div class="col-sm-6">
@@ -81,7 +81,7 @@ video::-webkit-media-controls {
 							<div id="packet_lost_container">PacketsLost: <span id="packet_lost_text"></span></div>
 							<div id="jitter_container">Jitter Average Delay(Secs): <span id="jitter_text"></span></div>
 							<div id="audio_level_container">Audio Level: <span id="audio_level"></span></div>
-							
+
 						</small>
 						</div>
 						<div class="col-sm-6">
@@ -128,12 +128,12 @@ video::-webkit-media-controls {
 		id = getUrlParameter("name");
 		if (typeof id != "undefined") {
 			$("#streamName").val(id);
-		} 
+		}
 		else {
 			$("#streamName").val("stream1");
 		}
 	  }
-	});		
+	});
 	var start_control_button = document.getElementById("start_control_button");
 	//start_play_button.addEventListener("click", startPlaying, false)
 	start_control_button.addEventListener("click", connectDataChannel, false)
@@ -149,7 +149,7 @@ video::-webkit-media-controls {
 	var hostId;
 	var controllerId;
 	var startRemoteDesktopControlSent = false;
-	
+
 	function toggleOptions() {
 		$(".options").toggle();
 	}
@@ -171,7 +171,7 @@ video::-webkit-media-controls {
 			alert("Message cannot be sent. Make sure you've enabled data channel and choose the correct player distribution on server web panel");
 		}
 	}
-	
+
 	function startPlaying() {
 		console.log("starting to play "+ streamId)
 		webRTCAdaptor.play(streamId, token, "", []);
@@ -188,7 +188,7 @@ video::-webkit-media-controls {
 	}
 
 	function sendStartRemoteDesktopControl() {
-		
+
 		console.log("SEND START REMOTE DESKTOP CONTROL")
 		if(controllerId == undefined){
 			controllerId = generateRandomString(4)
@@ -207,7 +207,7 @@ video::-webkit-media-controls {
 
 
 	}
-	
+
 	function toggleAudio(){
 		var remoteVideo=document.getElementById("remoteVideo");
 		var toggleAudioButton = document.getElementById("toggle_audio_button")
@@ -228,7 +228,7 @@ if (elem.requestFullscreen) {
   elem.mozRequestFullScreen();
 } else if (elem.webkitRequestFullscreen) {
   elem.webkitRequestFullscreen();
-} else if (elem.msRequestFullscreen) { 
+} else if (elem.msRequestFullscreen) {
   elem.msRequestFullscreen();
 }
 
@@ -250,19 +250,44 @@ if (elem.requestFullscreen) {
 		video : false,
 		audio : false
 	};
-	
+
 	var appName = location.pathname.substring(0, location.pathname.lastIndexOf("/")+1);
 	var path =  location.hostname + ":" + location.port + appName + "websocket";
 	var websocketURL =  "ws://" + path;
-	
+
 	if (location.protocol.startsWith("https")) {
 		websocketURL = "wss://" + path;
 	}
 
 	var remoteVideo = document.getElementById("remoteVideo");
-	
+
+	remoteVideo.addEventListener('contextmenu', (event) => {
+		// it captures right click
+		var clickEvent = {
+			event: "click",
+			button: event.button,
+			buttons: event.buttons,
+			shiftKey: event.shiftKey,
+			ctrlKey: event.ctrlKey
+		}
+		console.log("click event:");
+		console.log(clickEvent);
+		event.preventDefault();
+
+		var event = {
+			"type" :"controlAction",
+			"event":clickEvent
+		}
+		if(clickDisabled){
+			clickDisabled = false
+		}else{
+			sendData(event);
+
+		}
+	});
+
 	remoteVideo.addEventListener("mousemove", function (event) {
-		//clientWidth and clientHeight are the width and height(in pixels) that video tag takes places in the screen 
+		//clientWidth and clientHeight are the width and height(in pixels) that video tag takes places in the screen
 		//videoWidth and videoHeight are the width/height of the incoming video
 		//offsetX and offsetY is the pixel location where the mouse moves in clientWidth and clientHeight
 
@@ -275,18 +300,18 @@ if (elem.requestFullscreen) {
 		var offsetXEnd = 0;
 		var offsetYStart = 0;
 		var offsetYEnd = 0;
-		
-		if (clientAspectRatio > videoAspectRatio) 
+
+		if (clientAspectRatio > videoAspectRatio)
 		{
 			//it fills the height and there is space in width
 			videoClientOccupiedHeight = remoteVideo.clientHeight;
 			//calculate the width
-			videoClientOccupiedWidth =  parseInt(videoAspectRatio * videoClientOccupiedHeight);			
+			videoClientOccupiedWidth =  parseInt(videoAspectRatio * videoClientOccupiedHeight);
 		}
 		else {
 			//it fills the width and there is space in height
 			videoClientOccupiedWidth = remoteVideo.clientWidth;
-			videoClientOccupiedHeight = videoClientOccupiedWidth / videoAspectRatio;			
+			videoClientOccupiedHeight = videoClientOccupiedWidth / videoAspectRatio;
 		}
 
 		offsetXStart = parseInt((remoteVideo.clientWidth - videoClientOccupiedWidth)/2);
@@ -339,12 +364,12 @@ if (elem.requestFullscreen) {
 		console.log("mousemove event:");
 		console.log(mousemoveEvent);
 		}
-		
+
 
 	});
 
 	document.addEventListener("keydown", (event) => {
-		
+
 
 		var keydownEvent = {
 			event: "keydown",
@@ -367,11 +392,11 @@ if (elem.requestFullscreen) {
 			//I think keypress up may be a solution for this problem
 			remoteVideo.play();
 		}
-		
+
 	});
 
 	remoteVideo.addEventListener("click", function(event){
-		/* event.button: 
+		/* event.button:
 
 		0: Main button pressed, usually the left button or the un-initialized state
 		1: Auxiliary button pressed, usually the wheel button or the middle button (if present)
@@ -380,8 +405,8 @@ if (elem.requestFullscreen) {
 		4: Fifth button, typically the Browser Forward button
 
 		event.buttons:
-		Each button that can be pressed is represented by a given number (see below). 
-		If more than one button is pressed, the button values are added together to produce a new number. 
+		Each button that can be pressed is represented by a given number (see below).
+		If more than one button is pressed, the button values are added together to produce a new number.
 		For example, if the secondary (2) and auxiliary (4) buttons are pressed simultaneously, the value is 6 (i.e., 2 + 4).
 		*/
 		var clickEvent = {
@@ -412,7 +437,7 @@ if (elem.requestFullscreen) {
 		event.preventDefault()
 		var mouseDownData = {
 			event: "mousedown",
-			
+
 		}
 
 		var event = {
@@ -433,7 +458,7 @@ if (elem.requestFullscreen) {
 
 		var mouseUp = {
 			event: "mouseup",
-			
+
 		}
 
 		var event = {
@@ -446,7 +471,7 @@ if (elem.requestFullscreen) {
 	})
 
 	remoteVideo.addEventListener("wheel", function(event){
-		
+
 		var wheelEvent = {
 			event: "wheel",
 			deltaX: event.deltaX,
@@ -458,12 +483,12 @@ if (elem.requestFullscreen) {
 			"type" :"controlAction",
 			"event":wheelEvent
 		}
-		
+
 		console.log("wheel event:");
 		sendData(event);
 	});
 
-	
+
 
 	var webRTCAdaptor = new WebRTCAdaptor({
 		websocket_url : websocketURL,
@@ -481,7 +506,7 @@ if (elem.requestFullscreen) {
 				console.log("play started");
 				start_control_button.disabled = true;
 				stop_control_button.disabled = false;
-				webRTCAdaptor.getStreamInfo(streamId); 
+				webRTCAdaptor.getStreamInfo(streamId);
 				webRTCAdaptor.enableStats(obj.streamId);
 
 			} else if (info == "play_finished") {
@@ -491,7 +516,7 @@ if (elem.requestFullscreen) {
 				stop_control_button.disabled = true;
 				$("#stats_panel").hide();
 				// Reset stream resolutions in dropdown
-				document.getElementById("dropdownMenu").innerHTML = '<a class="dropdown-item active" href="#">Automatic</a>'; 
+				document.getElementById("dropdownMenu").innerHTML = '<a class="dropdown-item active" href="#">Automatic</a>';
 			} else if (info == "closed") {
 				//console.log("Connection closed");
 				if (typeof obj != "undefined") {
@@ -505,7 +530,7 @@ if (elem.requestFullscreen) {
 				}
 
 
-			}		
+			}
 			else if (info == "ice_connection_state_changed") {
 				console.log("iceConnectionState Changed: ",JSON.stringify(obj));
 			}
@@ -514,13 +539,13 @@ if (elem.requestFullscreen) {
 				//currentIncomingBitrate - kbits/sec
 				//packetsLost - total number of packet lost
 				//fractionLost - fraction of packet lost
-				 
+
 			}
 			else if (info == "data_received") {
 				console.log("---------DATA RECIEVED-------")
 				var data = JSON.parse(obj.data);
 				console.log(data)
-				
+
 				if(data.command == "setRdcStreamId"){
 					var localStreamId = data.rdcStreamId
 					streamId = localStreamId;
@@ -531,7 +556,7 @@ if (elem.requestFullscreen) {
 
 
 					}
-					
+
 				}else if(data.command == "rdcFinish"){
 					webRTCAdaptor.stop(hostId)
 
@@ -545,7 +570,7 @@ if (elem.requestFullscreen) {
 				stop_control_button.disabled = true;
 
 				}
-			
+
 
 
 
@@ -553,8 +578,8 @@ if (elem.requestFullscreen) {
 			}
 			else if (info == "bitrateMeasurement") {
 
-				console.debug(obj);	
-				
+				console.debug(obj);
+
 			}
 			else if(info == "resolutionChangeInfo"){
 				console.log("Resolution is changed to "+obj["streamHeight"]);
@@ -569,7 +594,7 @@ if (elem.requestFullscreen) {
 				startPlaying()
 
 			}else if(info == "rdcSessionFinished"){
-			
+
 
 			}
 			else {
@@ -578,8 +603,8 @@ if (elem.requestFullscreen) {
 		},
 		callbackError : function(error) {
 			//some of the possible errors, NotFoundError, SecurityError,PermissionDeniedError
-			
-	
+
+
 		}
 	});
 

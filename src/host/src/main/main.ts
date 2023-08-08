@@ -15,6 +15,7 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import Storage from './Storage';
+const os = require('os');
 var robot = require("@jitsi/robotjs");
 
 // Speed up the mouse.
@@ -90,8 +91,13 @@ ipcMain.on('controlEvent', async (event, arg) => {
     robot.mouseClick(button);
   }else if(controlEventType == "wheel"){
 
-      var deltaX = controlEvent.deltaX
-      var deltaY = controlEvent.deltaY
+      var deltaX = controlEvent.deltaX;
+      var deltaY = controlEvent.deltaY;
+
+    // on Windows, deltaY scrolling is inverted compared to OS X and Linux
+    if(os.platform() === "win32") {
+      deltaY = -deltaY;
+    }
 
     robot.scrollMouse(deltaX, deltaY);
 
