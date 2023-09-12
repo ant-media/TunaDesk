@@ -260,6 +260,31 @@ if (elem.requestFullscreen) {
 	}
 
 	var remoteVideo = document.getElementById("remoteVideo");
+
+	remoteVideo.addEventListener('contextmenu', (event) => {
+		// it captures right click
+		var clickEvent = {
+			event: "click",
+			button: event.button,
+			buttons: event.buttons,
+			shiftKey: event.shiftKey,
+			ctrlKey: event.ctrlKey
+		}
+		console.log("click event:");
+		console.log(clickEvent);
+		event.preventDefault();
+
+		var event = {
+			"type" :"controlAction",
+			"event":clickEvent
+		}
+		if(clickDisabled){
+			clickDisabled = false
+		}else{
+			sendData(event);
+
+		}
+	});
 	
 	remoteVideo.addEventListener("mousemove", function (event) {
 		//clientWidth and clientHeight are the width and height(in pixels) that video tag takes places in the screen 
