@@ -222,6 +222,7 @@ video::-webkit-media-controls {
 
 	function toggleFullscreen(){
 		var elem = document.getElementById("remoteVideo");
+		document.body.style.cursor = 'none';
 if (elem.requestFullscreen) {
   elem.requestFullscreen();
 } else if (elem.mozRequestFullScreen) {
@@ -233,6 +234,22 @@ if (elem.requestFullscreen) {
 }
 
 	}
+	document.addEventListener("fullscreenchange", function() {
+  if (!document.fullscreenElement) document.body.style.cursor = '';
+}, false);
+
+document.addEventListener("msfullscreenchange", function() {
+  if (!document.msFullscreenElement) document.body.style.cursor = '';
+}, false);
+
+document.addEventListener("mozfullscreenchange", function() {
+  if (!document.mozFullScreen) document.body.style.cursor = '';
+}, false);
+
+document.addEventListener("webkitfullscreenchange", function() {
+  if (!document.webkitIsFullScreen) document.body.style.cursor = '';
+}, false);
+
 	function sendStopRemoteDesktopControl() {
 		var jsCmd = {
             command: "rdcStopControlling",
